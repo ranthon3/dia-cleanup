@@ -127,10 +127,10 @@ class Relocator:
             return
         self.done.add(target)
         self.sources[target] = source
+        target.chmod(target.stat().st_mode | 0o200)
         # Homebrew artifacts may already have signatures; invalidate them explicitly.
         if subprocess.run(['codesign', '-dv', str(target)], capture_output=True).returncode == 0:
             run('codesign', '--remove-signature', target)
-        target.chmod(target.stat().st_mode | 0o200)
         own_id = run('otool', '-D', target).splitlines()[1:]
         for name in dependencies(run('otool', '-L', source)):
             if name in own_id or system_library(name):
