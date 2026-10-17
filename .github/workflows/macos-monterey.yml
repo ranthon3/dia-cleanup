@@ -1,0 +1,101 @@
+name: Apple Silicon macOS 12.6 DMG
+on:
+  push:
+    branches: [build/macos-arm64-12.6]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dmg:
+    runs-on: macos-15
+    timeout-minutes: 150
+    env:
+      DIA_MONTEREY_ROOT: ${{ runner.temp }}/dia-monterey
+      MACOSX_DEPLOYMENT_TARGET: '12.6'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          test "$(uname -m)" = arm64
+          df -h /
+          sysctl hw.memsize hw.ncpu
+          brew install autoconf automake libtool autoconf-archive bison flex make cmake pkgconf ninja ccache python rust
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+      - uses: actions/cache/restore@v4
+        id: stack-cache
+        with:
+          path: ${{ env.DIA_MONTEREY_ROOT }}
+          key: monterey-12.6-arm64-source-v1-${{ github.sha }}
+          restore-keys: monterey-12.6-arm64-source-v1-
+      - name: Configure pinned source stack
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/monterey.log") 2>&1
+          git init "$RUNNER_TEMP/gtk-osx"
+          git -C "$RUNNER_TEMP/gtk-osx" remote add origin https://github.com/GNOME/gtk-osx.git
+          git -C "$RUNNER_TEMP/gtk-osx" fetch --depth 1 origin 857ad1d7d6fc9b93d630782205f6fb2a74b62dc3
+          git -C "$RUNNER_TEMP/gtk-osx" checkout --detach FETCH_HEAD
+          git init "$RUNNER_TEMP/jhbuild"
+          git -C "$RUNNER_TEMP/jhbuild" remote add origin https://github.com/GNOME/jhbuild.git
+          git -C "$RUNNER_TEMP/jhbuild" fetch --depth 1 origin 16e05af9b58b9e7433ce7417ecd8915beba59133
+          git -C "$RUNNER_TEMP/jhbuild" checkout --detach FETCH_HEAD
+          python3 -m venv "$DIA_MONTEREY_ROOT/tools"
+          "$DIA_MONTEREY_ROOT/tools/bin/pip" install meson packaging setuptools pygments docutils gi-docgen
+          python3 installer/macosx/prepare_source_stack.py --gtk-osx "$RUNNER_TEMP/gtk-osx" --root "$DIA_MONTEREY_ROOT"
+          cat > "$DIA_MONTEREY_ROOT/jhbuild.py" <<'PY'
+          import os, sys, builtins
+          sys.path.insert(0, os.path.join(os.environ['RUNNER_TEMP'], 'jhbuild'))
+          builtins.PKGDATADIR = None
+          builtins.DATADIR = None
+          builtins.SRCDIR = os.path.join(os.environ['RUNNER_TEMP'], 'jhbuild')
+          import jhbuild.main
+          jhbuild.main.main(sys.argv[1:])
+          PY
+          echo "$DIA_MONTEREY_ROOT/tools/bin" >> "$GITHUB_PATH"
+      - name: Build target-compatible dependencies
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/monterey.log") 2>&1
+          "$DIA_MONTEREY_ROOT/tools/bin/python" "$DIA_MONTEREY_ROOT/jhbuild.py" -f "$DIA_MONTEREY_ROOT/jhbuildrc" --no-interact --exit-on-error build gettext
+          "$DIA_MONTEREY_ROOT/tools/bin/python" "$DIA_MONTEREY_ROOT/jhbuild.py" -f "$DIA_MONTEREY_ROOT/jhbuildrc" --no-interact --exit-on-error build libffi sqlite python3
+          "$DIA_MONTEREY_ROOT/prefix/bin/python3" -m pip install packaging setuptools mako markdown
+          "$DIA_MONTEREY_ROOT/tools/bin/python" "$DIA_MONTEREY_ROOT/jhbuild.py" -f "$DIA_MONTEREY_ROOT/jhbuildrc" --no-interact --exit-on-error build
+      - name: Build and package Dia
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/monterey.log") 2>&1
+          git init "$RUNNER_TEMP/xpm-pixbuf"
+          git -C "$RUNNER_TEMP/xpm-pixbuf" remote add origin https://gitlab.gnome.org/ZanderBrown/xpm-pixbuf.git
+          git -C "$RUNNER_TEMP/xpm-pixbuf" fetch --depth 1 origin d290a0c846687b22d2a8c5aaec83a6689f30e1c3
+          git -C "$RUNNER_TEMP/xpm-pixbuf" checkout --detach FETCH_HEAD
+          "$DIA_MONTEREY_ROOT/tools/bin/python" "$DIA_MONTEREY_ROOT/jhbuild.py" -f "$DIA_MONTEREY_ROOT/jhbuildrc" run bash installer/macosx/build_monterey.sh
+      - uses: actions/cache/save@v4
+        if: always() && steps.stack-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.DIA_MONTEREY_ROOT }}
+          key: monterey-12.6-arm64-source-v1-${{ github.sha }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dia-macOS-12.6-arm64
+          path: |
+            dist/Dia-macOS-12.6-arm64.dmg
+            dist/Dia-macOS-12.6-arm64.dmg.sha256
+          if-no-files-found: error
+      - name: Report failure
+        if: failure()
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'monterey.log'
+          text = path.read_text(errors='replace')[-3000:] if path.exists() else 'No log available'
+          print('::error title=Monterey build failure::' + text.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: monterey-build-logs
+          path: |
+            ${{ runner.temp }}/monterey.log
+            build-monterey/meson-logs/

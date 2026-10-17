@@ -1,6 +1,7 @@
 name: macOS application bundle
 on:
   push:
+    branches-ignore: [build/macos-arm64-12.6]
     paths: ['app/**', 'lib/**', 'objects/**', 'plug-ins/**', 'data/**', 'installer/macosx/**', 'meson*', '.github/workflows/macos.yml']
   pull_request:
     paths: ['app/**', 'lib/**', 'objects/**', 'plug-ins/**', 'data/**', 'installer/macosx/**', 'meson*', '.github/workflows/macos.yml']
