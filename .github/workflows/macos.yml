@@ -5,6 +5,16 @@ on:
   pull_request:
     paths: ['app/**', 'lib/**', 'objects/**', 'plug-ins/**', 'data/**', 'installer/macosx/**', 'meson*', '.github/workflows/macos.yml']
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Target macOS runner
+        type: choice
+        options: [macos-15, macos-15-intel, both]
+        default: macos-15
+      package_only:
+        description: Build the DMG without running Dia or its application tests
+        type: boolean
+        default: true
 permissions:
   contents: read
 jobs:
@@ -12,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        runner: ${{ fromJSON(github.ref_name == 'build/macos-arm64' && '["macos-15"]' || github.event_name == 'workflow_dispatch' && inputs.runner == 'macos-15' && '["macos-15"]' || github.event_name == 'workflow_dispatch' && inputs.runner == 'macos-15-intel' && '["macos-15-intel"]' || '["macos-15","macos-15-intel"]') }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -41,27 +51,46 @@ jobs:
           meson setup build-macos --prefix="$RUNNER_TEMP/dia-install" --libdir=lib -Ddoc=disabled -Dgtk_doc=false --wrap-mode=nofallback
           echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
           echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
+      - name: Verify runner architecture
+        run: |
+          if [ "${{ matrix.runner }}" = macos-15 ]; then
+            test "$(uname -m)" = arm64
+          else
+            test "$(uname -m)" = x86_64
+          fi
       - name: Build and test
+        env:
+          PACKAGE_ONLY: ${{ inputs.package_only || github.ref_name == 'build/macos-arm64' }}
         run: |
           python3 installer/macosx/test_bundle.py
           meson compile -C build-macos -j 4
-          meson test -C build-macos --print-errorlogs
-      - name: Package, relocate, and exercise the application
+          if [ "$PACKAGE_ONLY" != true ]; then
+            meson test -C build-macos --print-errorlogs
+          fi
+      - name: Package application
+        env:
+          PACKAGE_ONLY: ${{ inputs.package_only || github.ref_name == 'build/macos-arm64' }}
         run: |
           python3 installer/macosx/bundle.py --builddir build-macos --python "$(command -v python3)" --minimum-macos 15.0 --output dist/Dia.app
-          mv dist/Dia.app 'dist/Dia Test.app'
-          cd samples
-          env -u PKG_CONFIG_PATH -u PYTHONPATH -u PYTHONHOME '../dist/Dia Test.app/Contents/MacOS/dia' render-test.dia --export="$RUNNER_TEMP/dia-render.svg" 2> "$RUNNER_TEMP/dia-export.log"
-          cat "$RUNNER_TEMP/dia-export.log"
-          if grep -E 'could not import|Traceback|Failed to load' "$RUNNER_TEMP/dia-export.log"; then exit 1; fi
-          python3 -c 'import sys, xml.etree.ElementTree as E; r=E.parse(sys.argv[1]).getroot(); assert r.tag == "{http://www.w3.org/2000/svg}svg"; assert len(list(r.iter())) > 100; assert len(r.findall(".//{http://www.w3.org/2000/svg}image")) == 2' "$RUNNER_TEMP/dia-render.svg"
-          cd ..
-          codesign --verify --deep --strict 'dist/Dia Test.app'
-          sh installer/macosx/osx-dmg.sh 'dist/Dia Test.app' dist/Dia.dmg
+          if [ "$PACKAGE_ONLY" != true ]; then
+            mv dist/Dia.app 'dist/Dia Test.app'
+            cd samples
+            env -u PKG_CONFIG_PATH -u PYTHONPATH -u PYTHONHOME '../dist/Dia Test.app/Contents/MacOS/dia' render-test.dia --export="$RUNNER_TEMP/dia-render.svg" 2> "$RUNNER_TEMP/dia-export.log"
+            cat "$RUNNER_TEMP/dia-export.log"
+            if grep -E 'could not import|Traceback|Failed to load' "$RUNNER_TEMP/dia-export.log"; then exit 1; fi
+            python3 -c 'import sys, xml.etree.ElementTree as E; r=E.parse(sys.argv[1]).getroot(); assert r.tag == "{http://www.w3.org/2000/svg}svg"; assert len(list(r.iter())) > 100; assert len(r.findall(".//{http://www.w3.org/2000/svg}image")) == 2' "$RUNNER_TEMP/dia-render.svg"
+            cd ..
+            mv 'dist/Dia Test.app' dist/Dia.app
+          fi
+          codesign --verify --deep --strict dist/Dia.app
+          sh installer/macosx/osx-dmg.sh dist/Dia.app dist/Dia.dmg
+          shasum -a 256 dist/Dia.dmg > dist/Dia.dmg.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: Dia-${{ matrix.runner }}
-          path: dist/Dia.dmg
+          path: |
+            dist/Dia.dmg
+            dist/Dia.dmg.sha256
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
