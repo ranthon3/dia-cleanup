@@ -10,7 +10,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 150
     env:
-      DIA_MONTEREY_ROOT: ${{ runner.temp }}/dia-monterey
+      DIA_MONTEREY_ROOT: ${{ github.workspace }}/../dia-monterey
       MACOSX_DEPLOYMENT_TARGET: '12.6'
     steps:
       - uses: actions/checkout@v4
