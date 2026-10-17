@@ -122,6 +122,17 @@ exit 17
             self.assertEqual(origins[root / 'dest/one.dylib'], root / 'one/one.dylib')
             self.assertEqual(origins[root / 'dest/two.dylib'], root / 'two/two.dylib')
 
+    def test_system_pkgconfig_paths_do_not_bundle_apple_resources(self):
+        def output(*args):
+            if '--print-requires' in args:
+                return ''
+            if 'pc_path' in args:
+                return '/opt/homebrew/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig'
+            return '/opt/homebrew/opt/gtk+3'
+        with patch.object(bundle, 'run', side_effect=output):
+            prefixes = bundle.dependency_prefixes(['gtk+-3.0'])
+        self.assertEqual(prefixes, {Path('/opt/homebrew/opt/gtk+3'), Path('/opt/homebrew')})
+
     def test_read_only_dependency_trees_can_be_merged(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()

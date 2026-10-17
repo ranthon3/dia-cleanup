@@ -79,7 +79,7 @@ def dependency_prefixes(packages):
             continue
         visited.add(package)
         prefix = run('pkg-config', '--variable=prefix', package)
-        if prefix and Path(prefix).is_absolute():
+        if prefix and Path(prefix).is_absolute() and Path(prefix) not in (Path('/'), Path('/usr'), Path('/System')):
             prefixes.add(Path(prefix))
         for requirement in run('pkg-config', '--print-requires', package).splitlines():
             if requirement.strip():
@@ -89,7 +89,9 @@ def dependency_prefixes(packages):
     for directory in run('pkg-config', '--variable=pc_path', 'pkg-config').split(':'):
         path = Path(directory)
         if path.is_absolute() and path.name == 'pkgconfig' and path.parent.name in ('lib', 'share'):
-            prefixes.add(path.parent.parent)
+            common = path.parent.parent
+            if common not in (Path('/'), Path('/usr'), Path('/System')) and any(p.is_relative_to(common) for p in prefixes):
+                prefixes.add(common)
     return prefixes
 
 
