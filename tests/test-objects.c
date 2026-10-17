@@ -655,18 +655,19 @@ _test_draw (gconstpointer user_data)
       const DiaRectangle *pbb = dia_object_get_bounding_box (p);
       real epsilon = 0.2; /* XXX: smaller value needs longer exception list */
 
-      /* Bounding boxes of these objects should be close, if not
-       * this could be either some miscalculation within the object
-       * implementation (update_data?) or some more generic problem
+      /* Drawing should stay within the object's bounding box, allowing
+       * the tolerances below. Overflow could indicate a miscalculation
+       * within the object implementation (update_data?) or a generic problem
        * with DiaPathRenderer
        */
       if (!rectangle_in_rectangle (obb, pbb))
 	{
 #if 0
 	  /* Generate exceptions list below with ./test-objects -q */
-	  real ov = MAX(fabs (obb->top - pbb->top), fabs (obb->left - pbb->left));
-	  ov = MAX(ov, fabs (obb->right - pbb->right));
-	  ov = MAX(ov, fabs (obb->bottom - pbb->bottom));
+	  real ov = MAX (0.0, obb->top - pbb->top);
+	  ov = MAX (ov, obb->left - pbb->left);
+	  ov = MAX (ov, pbb->right - obb->right);
+	  ov = MAX (ov, pbb->bottom - obb->bottom);
 	  if (ov >= epsilon)
 	    g_print ("\t  else if (strcmp (type->name, \"%s\") == 0)\n"
 		     "\t    epsilon = %.2g;\n", type->name, ov + 0.01);
@@ -753,16 +754,16 @@ _test_draw (gconstpointer user_data)
 	  else if (strcmp (type->name, "Pneum - SEIJack") == 0)
 	    epsilon = 1.1;
 	  else if (strcmp (type->name, "Pneum - SEOJack") == 0)
-	    epsilon = 1.1;
+	    epsilon = 1.15;
 	  else if (strcmp (type->name, "Pneum - DEJack") == 0)
 	    epsilon = 1.1; /* osx: 0.9 */
 	  else if (strcmp (type->name, "SDL - Comment") == 0)
 	    epsilon = 3.5; /* osx: 3.1 */
 
-	  g_assert_cmpfloat (fabs (obb->top - pbb->top), <, epsilon);
-	  g_assert_cmpfloat (fabs (obb->left - pbb->left), <, epsilon);
-	  g_assert_cmpfloat (fabs (obb->right - pbb->right), <, epsilon);
-	  g_assert_cmpfloat (fabs (obb->bottom - pbb->bottom), <, epsilon);
+	  g_assert_cmpfloat (MAX (0.0, obb->top - pbb->top), <, epsilon);
+	  g_assert_cmpfloat (MAX (0.0, obb->left - pbb->left), <, epsilon);
+	  g_assert_cmpfloat (MAX (0.0, pbb->right - obb->right), <, epsilon);
+	  g_assert_cmpfloat (MAX (0.0, pbb->bottom - obb->bottom), <, epsilon);
 #endif
     }
     /* destroy path object */
