@@ -196,11 +196,16 @@ def relocate_font_config(resources, prefixes):
         text = config.read_text()
         # Fontconfig's external DTD can supply this namespace declaration.
         # ElementTree does not load external DTDs, so make it explicit.
-        if 'its:' in text and 'xmlns:its=' not in text:
+        root_tag = re.search(r'<fontconfig(?:\s[^>]*)?>', text)
+        if 'its:' in text and root_tag and 'xmlns:its' not in root_tag.group():
             text = re.sub(r'<fontconfig(?=[\s>])',
                           '<fontconfig xmlns:its="http://www.w3.org/2005/11/its"', text, count=1)
         ET.register_namespace('its', 'http://www.w3.org/2005/11/its')
-        tree = ET.ElementTree(ET.fromstring(text))
+        try:
+            tree = ET.ElementTree(ET.fromstring(text))
+        except ET.ParseError as error:
+            line = text.splitlines()[error.position[0] - 1]
+            raise RuntimeError(f'Invalid font configuration {config}: {error}: {line}') from error
         for node in tree.getroot().iter():
             if node.tag == 'cachedir':
                 node.set('prefix', 'xdg')

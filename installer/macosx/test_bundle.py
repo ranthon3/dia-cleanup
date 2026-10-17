@@ -169,7 +169,8 @@ exit 17
             config = resources / 'etc/fonts/fonts.conf'
             config.parent.mkdir(parents=True)
             config.write_text('<!DOCTYPE fontconfig SYSTEM "fonts.dtd">'
-                              '<fontconfig><description its:translate="yes">Fonts</description></fontconfig>')
+                              '<fontconfig><its:rules xmlns:its="http://www.w3.org/2005/11/its"/>'
+                              '<description its:translate="yes">Fonts</description></fontconfig>')
             bundle.relocate_font_config(resources, set())
             description = bundle.ET.parse(config).getroot().find('description')
             self.assertEqual(description.get('{http://www.w3.org/2005/11/its}translate'), 'yes')
