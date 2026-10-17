@@ -33,7 +33,7 @@ jobs:
       - name: Install native dependencies
         run: |
           exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
-          brew install gtk+3 glib graphene gettext gobject-introspection pygobject3 python meson ninja pkgconf appstream libxslt ccache
+          brew install gtk+3 glib graphene gettext gobject-introspection pygobject3 python meson ninja pkgconf appstream libxml2 libxslt ccache
           echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix python)/libexec/bin" >> "$GITHUB_PATH"
       - uses: actions/cache/restore@v4
@@ -48,11 +48,7 @@ jobs:
           exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
           set -euo pipefail
           export MACOSX_DEPLOYMENT_TARGET=15.0
-          export PKG_CONFIG_PATH="$RUNNER_TEMP/dia-deps/lib/pkgconfig:$(brew --prefix libxslt)/lib/pkgconfig:$(brew --prefix gettext)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-          git clone --depth 1 --branch v2.14.6 https://github.com/GNOME/libxml2.git "$RUNNER_TEMP/libxml2"
-          meson setup "$RUNNER_TEMP/libxml-build" "$RUNNER_TEMP/libxml2" --prefix="$RUNNER_TEMP/dia-deps" --libdir=lib -Dlegacy=enabled
-          meson compile -C "$RUNNER_TEMP/libxml-build" -j 4
-          meson install -C "$RUNNER_TEMP/libxml-build"
+          export PKG_CONFIG_PATH="$RUNNER_TEMP/dia-deps/lib/pkgconfig:$(brew --prefix libxml2)/lib/pkgconfig:$(brew --prefix libxslt)/lib/pkgconfig:$(brew --prefix gettext)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
           git init "$RUNNER_TEMP/xpm-pixbuf"
           git -C "$RUNNER_TEMP/xpm-pixbuf" remote add origin https://gitlab.gnome.org/ZanderBrown/xpm-pixbuf.git
           git -C "$RUNNER_TEMP/xpm-pixbuf" fetch --depth 1 origin d290a0c846687b22d2a8c5aaec83a6689f30e1c3
