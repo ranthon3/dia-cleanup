@@ -103,7 +103,7 @@ jobs:
           import os
           from pathlib import Path
           log = Path(os.environ['RUNNER_TEMP']) / 'dia-build.log'
-          text = log.read_text(errors='replace')[-18000:] if log.exists() else 'No build log available'
+          text = log.read_text(errors='replace')[-3000:] if log.exists() else 'No build log available'
           text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
           print('::error title=macOS build failure::' + text)
       - uses: actions/upload-artifact@v4
