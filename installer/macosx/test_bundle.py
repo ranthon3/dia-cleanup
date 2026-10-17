@@ -122,6 +122,20 @@ exit 17
             self.assertEqual(origins[root / 'dest/one.dylib'], root / 'one/one.dylib')
             self.assertEqual(origins[root / 'dest/two.dylib'], root / 'two/two.dylib')
 
+    def test_read_only_dependency_trees_can_be_merged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = root / 'source'
+            source.mkdir()
+            library = source / 'module.so'
+            library.write_bytes(b'old')
+            library.chmod(0o444)
+            bundle.copy_tree(source, root / 'dest')
+            bundle.copy_tree(source, root / 'dest')
+            copied = root / 'dest/module.so'
+            copied.write_bytes(b'relocated')
+            self.assertEqual(library.read_bytes(), b'old')
+
     def test_font_configuration_is_relocatable_and_uses_user_cache(self):
         with tempfile.TemporaryDirectory() as temporary:
             resources = Path(temporary).resolve() / 'Resources'

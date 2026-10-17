@@ -49,10 +49,19 @@ def system_library(name):
     return name.startswith(('/System/Library/', '/usr/lib/'))
 
 
+def make_writable(directory):
+    if directory.exists():
+        for path in [directory, *directory.rglob('*')]:
+            if not path.is_symlink():
+                path.chmod(path.stat().st_mode | (0o700 if path.is_dir() else 0o200))
+
+
 def copy_tree(source, destination, origins=None):
     if source.exists():
+        make_writable(destination)
         # Dereference package-manager symlinks: no references outside the bundle.
         shutil.copytree(source, destination, symlinks=False, dirs_exist_ok=True)
+        make_writable(destination)
         if origins is not None:
             for original in source.rglob('*'):
                 path = destination / original.relative_to(source)
