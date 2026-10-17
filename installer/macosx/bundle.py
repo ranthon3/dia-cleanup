@@ -193,7 +193,14 @@ stdlib=sysconfig.get_path("stdlib"), gi=gi.__path__[0], cairo=cairo.__path__[0])
 
 def relocate_font_config(resources, prefixes):
     for config in (resources / 'etc/fonts').rglob('*.conf'):
-        tree = ET.parse(config)
+        text = config.read_text()
+        # Fontconfig's external DTD can supply this namespace declaration.
+        # ElementTree does not load external DTDs, so make it explicit.
+        if 'its:' in text and 'xmlns:its=' not in text:
+            text = re.sub(r'<fontconfig(?=[\s>])',
+                          '<fontconfig xmlns:its="http://www.w3.org/2005/11/its"', text, count=1)
+        ET.register_namespace('its', 'http://www.w3.org/2005/11/its')
+        tree = ET.ElementTree(ET.fromstring(text))
         for node in tree.getroot().iter():
             if node.tag == 'cachedir':
                 node.set('prefix', 'xdg')
