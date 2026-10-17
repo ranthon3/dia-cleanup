@@ -18,6 +18,18 @@ Meson, Ninja, pkg-config, appstream and libxml2's command-line utilities. Option
 PDF import additionally needs compatible Poppler development headers. See
 BUILDING.md and the macOS CI workflow for a concrete build recipe.
 
+For Homebrew builds, use the same Homebrew libxml2 for Dia and libxslt. The
+successful arm64 build used libxml2 2.15.4 with legacy APIs enabled by Homebrew.
+Make the keg-only library visible before configuring Meson:
+
+```sh
+export PKG_CONFIG_PATH="$(brew --prefix libxml2)/lib/pkgconfig:$(brew --prefix libxslt)/lib/pkgconfig:$(brew --prefix gettext)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+```
+
+Keep any local xpm-pixbuf prefix ahead of these paths. The workflow builds
+xpm-pixbuf at commit `d290a0c846687b22d2a8c5aaec83a6689f30e1c3`. The packager
+rejects conflicting libxml2 copies rather than selecting one arbitrarily.
+
 The `--python` interpreter must import `gi` and `cairo` and match the
 `python3-embed` pkg-config dependency used to build Dia. The packager copies that
 interpreter's standard library and bindings, not arbitrary global site-packages.
@@ -27,18 +39,19 @@ interpreter's standard library and bindings, not arbitrary global site-packages.
 For example, with dependencies already available through pkg-config:
 
 ```sh
-export MACOSX_DEPLOYMENT_TARGET=14.0
+export MACOSX_DEPLOYMENT_TARGET=15.0
 meson setup build-macos --prefix="$PWD/build-macos/install" \
   -Ddoc=disabled -Dgtk_doc=false
 meson compile -C build-macos -j 4
 meson test -C build-macos --print-errorlogs
 python3 installer/macosx/test_bundle.py
 python3 installer/macosx/bundle.py --builddir build-macos \
-  --python "$(command -v python3)" --minimum-macos 14.0 \
+  --python "$(command -v python3)" --minimum-macos 15.0 \
   --output dist/Dia.app
 ```
 
-`14.0` is an example, not a claim of support for every dependency on that OS.
+`15.0` matches the verified Apple Silicon build. Other deployment targets need
+their own compatible dependency builds and validation.
 Choose a deployment target that your dependencies support. The builder rejects
 binaries requiring a newer macOS version or missing the application's CPU
 architectures. Set the target when building dependencies too; changing plist
@@ -56,12 +69,39 @@ icons, translations, font configuration and the Python3 runtime. It doesn't
 bundle Apple system libraries or GTK2 themes. Python plugins installed by users
 may require additional third-party packages, which are not included automatically.
 
-A native, signed entry point invokes the resource launcher, which resolves paths from its location and forwards command-line
-arguments. GdkPixbuf's loader cache and GTK3's optional input-module cache are generated outside the signed app for each
-launch and removed on exit. Fontconfig uses its normal user cache. GTK introspection typelibs are rebuilt from their GIR sources with explicit
+A native, signed entry point invokes the resource launcher, which resolves
+paths from its location and forwards command-line arguments. GdkPixbuf's loader
+cache and GTK3's optional input-module cache are generated outside the signed
+app for each launch and removed on exit. Fontconfig uses its normal user cache.
+GTK introspection typelibs are rebuilt from their GIR sources with explicit
 bundle-relative library references. Both linked and dynamically loaded libraries
-resolve inside the bundle without DYLD search-path overrides. No unversioned system
-Python, global GTK configuration or writable application directory is required.
+resolve inside the bundle without DYLD search-path overrides. No unversioned
+system Python, global GTK configuration or writable application directory is
+required.
+
+## Saved build adjustments
+
+The reusable builder includes the corrections verified during the first native
+Apple Silicon DMG build:
+
+- Dependency copies are made writable before merging or relocation; source
+  Homebrew files remain unchanged.
+- Apple system resource directories are excluded from dependency discovery.
+- Fontconfig's DTD-provided `its` and `xsi` namespace declarations are made
+  explicit before parsing, and its paths and cache locations are relocated.
+- Existing Mach-O signature load commands are retained during relocation to
+  preserve arm64 `__LINKEDIT` layout. Final signing replaces invalidated signatures.
+
+The workflow caches compiler outputs, reports the end of failing build logs,
+and uploads `Dia.dmg` together with `Dia.dmg.sha256`. Manual runs accept a target
+runner and a `package_only` option, which skips application tests and launch checks
+while retaining packaging tests, relocation checks, signing verification, and
+DMG verification. Pushes to `build/macos-arm64` use that Apple Silicon build-only
+mode; normal branch CI retains the Intel/Apple Silicon matrix and application checks.
+
+[The successful Apple Silicon run](https://github.com/ranthon3/dia-cleanup/actions/runs/39036535501)
+verified the macOS 15+ arm64 build, bundle signatures, and disk image. It used
+ad-hoc signing and did not launch Dia or perform Developer ID notarization.
 
 ## Validate the artifact
 
@@ -93,7 +133,7 @@ Keychain and a numeric build number:
 
 ```sh
 python3 installer/macosx/bundle.py --builddir build-macos \
-  --python "$(command -v python3)" --minimum-macos 14.0 \
+  --python "$(command -v python3)" --minimum-macos 15.0 \
   --bundle-version 12 --sign-identity 'Developer ID Application: Your Name (TEAMID)' \
   --output dist/Dia.app
 sh installer/macosx/osx-dmg.sh dist/Dia.app dist/Dia.dmg
