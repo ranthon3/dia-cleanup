@@ -125,6 +125,26 @@ and basic application behavior; it does not replace manual Finder/GUI testing.
 GTK's native macOS file-open event handling must also be checked independently
 of command-line argument forwarding.
 
+## Apple Silicon builds for macOS 12.6
+
+The `macos-monterey.yml` workflow builds an isolated arm64 runtime from source
+with `MACOSX_DEPLOYMENT_TARGET=12.6`. It uses pinned GTK-OSX and JHBuild revisions;
+`prepare_source_stack.py` copies their modulesets and validates SHA256 pins for
+the selected source archives. Homebrew supplies host build tools, while
+pkg-config searches only the isolated runtime prefix for library dependencies.
+The upstream GTK-OSX bootstrap shell script is not executed.
+
+`build_monterey.sh` runs within that JHBuild environment, builds the pinned
+xpm-pixbuf revision and Dia, and packages `Dia-macOS-12.6-arm64.dmg` with a SHA256
+file. Packaging rejects bundled binaries whose deployment version exceeds 12.6,
+then verifies the app signature and disk image. This build-only workflow does
+not launch Dia; testing the application on macOS 12.6 remains a separate step.
+
+The workflow caches the source stack under a normalized absolute path. Its host
+Autotools macro search includes Homebrew's `pkg.m4`, which libxml2's bootstrap
+requires. CMake is used from Homebrew as a host tool rather than rebuilt as part
+of the runtime stack.
+
 ## Signing, disk images and notarization
 
 Without `--sign-identity`, the builder ad-hoc signs the bundle for local testing.
