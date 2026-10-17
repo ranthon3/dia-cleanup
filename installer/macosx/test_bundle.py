@@ -126,7 +126,7 @@ exit 17
         def output(*args):
             if '--print-requires' in args:
                 return ''
-            if 'pc_path' in args:
+            if '--variable=pc_path' in args:
                 return '/opt/homebrew/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig'
             return '/opt/homebrew/opt/gtk+3'
         with patch.object(bundle, 'run', side_effect=output):
