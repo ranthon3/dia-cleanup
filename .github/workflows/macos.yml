@@ -1,0 +1,69 @@
+name: macOS application bundle
+on:
+  push:
+    paths: ['app/**', 'lib/**', 'objects/**', 'plug-ins/**', 'data/**', 'installer/macosx/**', 'meson*', '.github/workflows/macos.yml']
+  pull_request:
+    paths: ['app/**', 'lib/**', 'objects/**', 'plug-ins/**', 'data/**', 'installer/macosx/**', 'meson*', '.github/workflows/macos.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          brew install gtk+3 glib graphene gettext gobject-introspection pygobject3 python meson ninja pkgconf appstream libxslt
+          echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix python)/libexec/bin" >> "$GITHUB_PATH"
+      - name: Build pinned dependencies and configure Dia
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MACOSX_DEPLOYMENT_TARGET=15.0
+          export PKG_CONFIG_PATH="$RUNNER_TEMP/dia-deps/lib/pkgconfig:$(brew --prefix libxslt)/lib/pkgconfig:$(brew --prefix gettext)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          git clone --depth 1 --branch v2.14.6 https://github.com/GNOME/libxml2.git "$RUNNER_TEMP/libxml2"
+          meson setup "$RUNNER_TEMP/libxml-build" "$RUNNER_TEMP/libxml2" --prefix="$RUNNER_TEMP/dia-deps" --libdir=lib -Dlegacy=enabled
+          meson compile -C "$RUNNER_TEMP/libxml-build" -j 4
+          meson install -C "$RUNNER_TEMP/libxml-build"
+          git init "$RUNNER_TEMP/xpm-pixbuf"
+          git -C "$RUNNER_TEMP/xpm-pixbuf" remote add origin https://gitlab.gnome.org/ZanderBrown/xpm-pixbuf.git
+          git -C "$RUNNER_TEMP/xpm-pixbuf" fetch --depth 1 origin d290a0c846687b22d2a8c5aaec83a6689f30e1c3
+          git -C "$RUNNER_TEMP/xpm-pixbuf" checkout --detach FETCH_HEAD
+          meson setup "$RUNNER_TEMP/xpm-build" "$RUNNER_TEMP/xpm-pixbuf" --prefix="$RUNNER_TEMP/dia-deps" --libdir=lib
+          meson compile -C "$RUNNER_TEMP/xpm-build" -j 4
+          meson install -C "$RUNNER_TEMP/xpm-build"
+          meson setup build-macos --prefix="$RUNNER_TEMP/dia-install" --libdir=lib -Ddoc=disabled -Dgtk_doc=false --wrap-mode=nofallback
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+          echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
+      - name: Build and test
+        run: |
+          python3 installer/macosx/test_bundle.py
+          meson compile -C build-macos -j 4
+          meson test -C build-macos --print-errorlogs
+      - name: Package, relocate, and exercise the application
+        run: |
+          python3 installer/macosx/bundle.py --builddir build-macos --python "$(command -v python3)" --minimum-macos 15.0 --output dist/Dia.app
+          mv dist/Dia.app 'dist/Dia Test.app'
+          cd samples
+          env -u PKG_CONFIG_PATH -u PYTHONPATH -u PYTHONHOME '../dist/Dia Test.app/Contents/MacOS/dia' render-test.dia --export="$RUNNER_TEMP/dia-render.svg" 2> "$RUNNER_TEMP/dia-export.log"
+          cat "$RUNNER_TEMP/dia-export.log"
+          if grep -E 'could not import|Traceback|Failed to load' "$RUNNER_TEMP/dia-export.log"; then exit 1; fi
+          python3 -c 'import sys, xml.etree.ElementTree as E; r=E.parse(sys.argv[1]).getroot(); assert r.tag == "{http://www.w3.org/2000/svg}svg"; assert len(list(r.iter())) > 100; assert len(r.findall(".//{http://www.w3.org/2000/svg}image")) == 2' "$RUNNER_TEMP/dia-render.svg"
+          cd ..
+          codesign --verify --deep --strict 'dist/Dia Test.app'
+          sh installer/macosx/osx-dmg.sh 'dist/Dia Test.app' dist/Dia.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dia-${{ matrix.runner }}
+          path: dist/Dia.dmg
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: macos-logs-${{ matrix.runner }}
+          path: build-macos/meson-logs/

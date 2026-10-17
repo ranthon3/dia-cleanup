@@ -17,6 +17,12 @@ Our key dependencies are Gtk 3, GLib/GIO, libxml2, cairo, and graphene.
 Some optional dependencies include libxslt, for the XSLT translation plug-in,
 and python3/PyGObject for python scripting.
 
+### macOS
+
+Build with Meson as described below. To create a relocatable `.app` and DMG,
+follow [the macOS packaging guide](installer/macosx/README.md). It covers GTK3
+and Python3 dependencies, deployment targets, signing, and notarization.
+
 ### Windows
 
 Currently (as of 1f930b94) the Windows build is under heavy development and not all features are supported.  Help is always welcome!

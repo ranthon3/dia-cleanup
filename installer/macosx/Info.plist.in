@@ -2,54 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>English</string>
-	<key>CFBundleExecutable</key>
-	<string>Resources/bin/dia</string>
-	<key>CFBundleName</key>
-	<string>Dia</string>
-	<key>CFBundleGetInfoString</key>
-	<string>@VERSION, Copyright 1998-2011 Dia Developers</string>
-	<key>CFBundleIconFile</key>
-	<string>Dia.icns</string>
-	<key>CFBundleIdentifier</key>
-	<string>Dia</string>
-	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeExtensions</key>
-			<array>
-				<string>dia</string>
-			</array>
-			<key>CFBundleTypeIconFile</key>
-			<string>image-svg+xml.icns</string>
-			<key>CFBundleTypeMIMETypes</key>
-			<array>
-				<string>dia</string>
-			</array>
-			<key>CFBundleTypeName</key>
-			<string>Dia Diagram File</string>
-			<key>CFBundleTypeOSTypes</key>
-			<array>
-				<string>dia </string>
-			</array>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-		</dict>
-	</array>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>@VERSION</string>
-	<key>CFBundleSignature</key>
-	<string>Dia</string>
-	<key>CFBundleVersion</key>
-	<string>@VERSION</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2010, 2011 Dia Developers, GNU General Public License.</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>10.6</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleExecutable</key><string>dia</string>
+  <key>CFBundleName</key><string>Dia</string>
+  <key>CFBundleDisplayName</key><string>Dia</string>
+  <key>CFBundleIdentifier</key><string>org.gnome.Dia</string>
+  <key>CFBundleIconFile</key><string>Dia.icns</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Dia contributors. GNU General Public License.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array><dict>
+    <key>CFBundleTypeExtensions</key><array><string>dia</string></array>
+    <key>CFBundleTypeName</key><string>Dia Diagram</string>
+    <key>CFBundleTypeRole</key><string>Editor</string>
+    <key>LSHandlerRank</key><string>Owner</string>
+  </dict></array>
 </dict>
 </plist>

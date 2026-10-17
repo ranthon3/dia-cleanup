@@ -110,6 +110,11 @@ dia_get_locale_directory (void)
 
   return ret;
 #else
+  const char *localedir = g_getenv ("DIA_LOCALE_PATH");
+
+  if (localedir != NULL) {
+    return g_strdup (localedir);
+  }
   return g_strdup (LOCALEDIR);
 #endif
 }
