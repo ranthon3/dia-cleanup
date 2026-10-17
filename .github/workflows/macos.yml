@@ -28,12 +28,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install native dependencies
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
           brew install gtk+3 glib graphene gettext gobject-introspection pygobject3 python meson ninja pkgconf appstream libxslt
           echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix python)/libexec/bin" >> "$GITHUB_PATH"
       - name: Build pinned dependencies and configure Dia
         shell: bash
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
           set -euo pipefail
           export MACOSX_DEPLOYMENT_TARGET=15.0
           export PKG_CONFIG_PATH="$RUNNER_TEMP/dia-deps/lib/pkgconfig:$(brew --prefix libxslt)/lib/pkgconfig:$(brew --prefix gettext)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
@@ -53,6 +55,7 @@ jobs:
           echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
       - name: Verify runner architecture
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
           if [ "${{ matrix.runner }}" = macos-15 ]; then
             test "$(uname -m)" = arm64
           else
@@ -62,6 +65,7 @@ jobs:
         env:
           PACKAGE_ONLY: ${{ inputs.package_only || github.ref_name == 'build/macos-arm64' }}
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
           python3 installer/macosx/test_bundle.py
           meson compile -C build-macos -j 4
           if [ "$PACKAGE_ONLY" != true ]; then
@@ -71,6 +75,7 @@ jobs:
         env:
           PACKAGE_ONLY: ${{ inputs.package_only || github.ref_name == 'build/macos-arm64' }}
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
           python3 installer/macosx/bundle.py --builddir build-macos --python "$(command -v python3)" --minimum-macos 15.0 --output dist/Dia.app
           if [ "$PACKAGE_ONLY" != true ]; then
             mv dist/Dia.app 'dist/Dia Test.app'
@@ -91,6 +96,16 @@ jobs:
           path: |
             dist/Dia.dmg
             dist/Dia.dmg.sha256
+      - name: Report build failure
+        if: failure()
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          log = Path(os.environ['RUNNER_TEMP']) / 'dia-build.log'
+          text = log.read_text(errors='replace')[-18000:] if log.exists() else 'No build log available'
+          text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::error title=macOS build failure::' + text)
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

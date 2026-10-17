@@ -28,7 +28,7 @@ example (architecture x86_64):
 
     def test_resolve_staged_library_and_inherited_rpath(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             app = root / 'Dia.app'
             app.mkdir()
             stage = root / 'stage'
@@ -45,7 +45,7 @@ example (architecture x86_64):
 
     def test_verify_rejects_build_machine_dependency(self):
         with tempfile.TemporaryDirectory() as temporary:
-            app = Path(temporary) / 'Dia.app'
+            app = Path(temporary).resolve() / 'Dia.app'
             (app / 'Contents/MacOS').mkdir(parents=True)
             binary = app / 'Contents/MacOS/dia-bin'
             binary.write_bytes(b'\xcf\xfa\xed\xfe')
@@ -60,7 +60,7 @@ example (architecture x86_64):
 
     def test_verify_rejects_external_symlink(self):
         with tempfile.TemporaryDirectory() as temporary:
-            app = Path(temporary) / 'Dia.app'
+            app = Path(temporary).resolve() / 'Dia.app'
             app.mkdir()
             (app / 'outside').symlink_to('/tmp')
             relocator = bundle.Relocator(app, Path('/prefix'), Path('/stage'))
@@ -69,7 +69,7 @@ example (architecture x86_64):
 
     def test_launcher_preserves_arguments_status_and_cleans_cache(self):
         with tempfile.TemporaryDirectory(prefix='dia app with spaces ') as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             macos = root / 'Dia.app/Contents/MacOS'
             resources = root / 'Dia.app/Contents/Resources'
             macos.mkdir(parents=True)
@@ -112,7 +112,7 @@ exit 17
 
     def test_copy_tree_preserves_origins_across_merged_directories(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             origins = {}
             for name in ('one', 'two'):
                 source = root / name
@@ -124,7 +124,7 @@ exit 17
 
     def test_font_configuration_is_relocatable_and_uses_user_cache(self):
         with tempfile.TemporaryDirectory() as temporary:
-            resources = Path(temporary) / 'Resources'
+            resources = Path(temporary).resolve() / 'Resources'
             config = resources / 'etc/fonts/fonts.conf'
             config.parent.mkdir(parents=True)
             config.write_text('<fontconfig><dir>/opt/brew/share/fonts</dir>'
@@ -140,7 +140,7 @@ exit 17
 
     def test_typelib_dependency_closure_uses_bundled_libraries(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             prefix = root / 'prefix'
             gir = prefix / 'share/gir-1.0'
             gir.mkdir(parents=True)
