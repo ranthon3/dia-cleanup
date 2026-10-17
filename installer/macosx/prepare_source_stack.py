@@ -73,7 +73,8 @@ moduleset = {str(root / 'dia.modules')!r}
 modulesets_dir = {str(root / 'modulesets-stable')!r}
 use_local_modulesets = True
 modules = ['gettext', 'libffi', 'sqlite', 'python3', 'gtk+-3.0', 'pygobject3', 'graphene', 'libxml2', 'adwaita-icon-theme']
-skip = ['nasm', 'gtk-doc']
+# CMake is a host build tool supplied by Homebrew, never a bundled dependency.
+skip = ['nasm', 'gtk-doc', 'cmake']
 ignore_suggests = True
 makeargs = '-j4'
 os.environ['CFLAGS'] = '-O2 -g0'
