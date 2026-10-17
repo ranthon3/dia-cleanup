@@ -130,9 +130,9 @@ class Relocator:
         self.done.add(target)
         self.sources[target] = source
         target.chmod(target.stat().st_mode | 0o200)
-        # Homebrew artifacts may already have signatures; invalidate them explicitly.
-        if subprocess.run(['codesign', '-dv', str(target)], capture_output=True).returncode == 0:
-            run('codesign', '--remove-signature', target)
+        # Keep the existing signature load command during relocation: removing it
+        # can leave arm64 __LINKEDIT layouts that install_name_tool rejects.
+        # Relocation invalidates the old signature; final signing replaces it.
         own_id = run('otool', '-D', target).splitlines()[1:]
         for name in dependencies(run('otool', '-L', source)):
             if name in own_id or system_library(name):
