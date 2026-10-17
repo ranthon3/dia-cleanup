@@ -24,14 +24,24 @@ jobs:
       matrix:
         runner: ${{ fromJSON(github.ref_name == 'build/macos-arm64' && '["macos-15"]' || github.event_name == 'workflow_dispatch' && inputs.runner == 'macos-15' && '["macos-15"]' || github.event_name == 'workflow_dispatch' && inputs.runner == 'macos-15-intel' && '["macos-15-intel"]' || '["macos-15","macos-15-intel"]') }}
     runs-on: ${{ matrix.runner }}
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CC: ccache clang
+      CXX: ccache clang++
     steps:
       - uses: actions/checkout@v4
       - name: Install native dependencies
         run: |
           exec > >(tee -a "$RUNNER_TEMP/dia-build.log") 2>&1
-          brew install gtk+3 glib graphene gettext gobject-introspection pygobject3 python meson ninja pkgconf appstream libxslt
+          brew install gtk+3 glib graphene gettext gobject-introspection pygobject3 python meson ninja pkgconf appstream libxslt ccache
           echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix python)/libexec/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache/restore@v4
+        id: compiler-cache
+        with:
+          path: .ccache
+          key: macos-ccache-${{ matrix.runner }}-${{ github.sha }}
+          restore-keys: macos-ccache-${{ matrix.runner }}-
       - name: Build pinned dependencies and configure Dia
         shell: bash
         run: |
@@ -71,6 +81,11 @@ jobs:
           if [ "$PACKAGE_ONLY" != true ]; then
             meson test -C build-macos --print-errorlogs
           fi
+      - uses: actions/cache/save@v4
+        if: steps.compiler-cache.outputs.cache-hit != 'true'
+        with:
+          path: .ccache
+          key: macos-ccache-${{ matrix.runner }}-${{ github.sha }}
       - name: Package application
         env:
           PACKAGE_ONLY: ${{ inputs.package_only || github.ref_name == 'build/macos-arm64' }}

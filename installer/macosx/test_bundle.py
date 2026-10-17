@@ -175,6 +175,17 @@ exit 17
             description = bundle.ET.parse(config).getroot().find('description')
             self.assertEqual(description.get('{http://www.w3.org/2005/11/its}translate'), 'yes')
 
+    def test_fontconfig_schema_instance_namespace_from_dtd(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resources = Path(temporary).resolve() / 'Resources'
+            config = resources / 'etc/fonts/48-guessfamily.conf'
+            config.parent.mkdir(parents=True)
+            config.write_text('<!DOCTYPE fontconfig SYSTEM "fonts.dtd">'
+                              '<fontconfig><match><test><const xsi:nil="true"/></test></match></fontconfig>')
+            bundle.relocate_font_config(resources, set())
+            const = bundle.ET.parse(config).getroot().find('match/test/const')
+            self.assertEqual(const.get('{http://www.w3.org/2001/XMLSchema-instance}nil'), 'true')
+
     def test_typelib_dependency_closure_uses_bundled_libraries(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
